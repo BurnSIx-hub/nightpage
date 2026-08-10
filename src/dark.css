@@ -61,6 +61,31 @@ html.np-keep-media:not(.np-off) :is(
 }
 
 /* ------------------------------------------------------------
+   The home screen (the document list) is ordinary DOM, so its
+   previews can be reached directly.
+
+   Two different shapes: template previews are <img>, while
+   document thumbnails are a background-image on a bare div.
+   Both classes are scoped to docs-homescreen, so UI sprites
+   served from the same hosts stay out of it.
+
+   For the templates we target the <img> rather than its
+   container — the container also holds the hover overlay,
+   which should keep inverting with the rest of the UI.
+
+   The trade-off: a thumbnail of a text document now renders as
+   a light sheet, the way the document actually looks. Turning
+   "Keep image colors" off puts these back to dark along with
+   everything else.
+   ------------------------------------------------------------ */
+html.np-keep-media:not(.np-off) :is(
+  .docs-homescreen-templates-templateview-preview img,
+  .docs-homescreen-grid-item-thumbnail
+) {
+  filter: invert(1) contrast(calc(1 / var(--np-contrast))) hue-rotate(180deg);
+}
+
+/* ------------------------------------------------------------
    Fixes layered on top of the inversion.
    ------------------------------------------------------------ */
 

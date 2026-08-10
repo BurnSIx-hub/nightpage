@@ -68,8 +68,14 @@ Docs moves text tiles through `drawImage` as well, but those sources are
 canvases; the source type is what separates them, and only real images are
 touched.
 
-DOM elements — collaborator avatars, menu previews — are handled the simpler
-way, with a CSS filter of their own: a child filter runs before its parent's.
+DOM elements — collaborator avatars, template previews, document thumbnails on
+the home screen — are handled the simpler way, with a CSS filter of their own:
+a child filter runs before its parent's.
+
+One consequence worth knowing: on the home screen a thumbnail of a text
+document then renders as a light sheet, because that is what the document
+actually looks like. Turning **Keep image colors** off puts the thumbnails back
+to dark along with everything else.
 
 The two content scripts live in different worlds and never talk directly.
 `content.js` sits in the isolated world and writes state into classes and a
