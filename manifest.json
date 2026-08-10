@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Тёмная тема для Google Docs",
+  "version": "1.0.0",
+  "description": "Тёмное оформление документов и интерфейса Google Docs с регулировкой глубины чёрного.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/document/*"],
+      "css": ["src/dark.css"],
+      "js": ["src/content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://docs.google.com/document/*"],
+      "js": ["src/canvas-images.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Тёмная тема для Google Docs",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "toggle-dark": {
+      "suggested_key": { "default": "Alt+Shift+D" },
+      "description": "Включить или выключить тёмную тему"
+    }
+  }
+}

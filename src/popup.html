@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Тёмная тема<span>Google Docs</span></h1>
+    <label class="switch" title="Включить или выключить">
+      <input type="checkbox" id="enabled">
+      <span class="track"><span class="knob"></span></span>
+    </label>
+  </header>
+
+  <div class="body" id="body">
+    <section>
+      <div class="row">
+        <label for="intensity">Глубина чёрного</label>
+        <output id="intensity-out">30</output>
+      </div>
+      <input type="range" id="intensity" min="0" max="100" step="1">
+      <div class="preview" id="preview">
+        <span>Текст документа</span>
+      </div>
+    </section>
+
+    <section>
+      <label class="check">
+        <input type="checkbox" id="keepMedia">
+        <span>
+          Картинки в оригинале
+          <em>Возвращает цвета фотографий. Насыщенные красный
+          и жёлтый останутся приглушёнными</em>
+        </span>
+      </label>
+    </section>
+  </div>
+
+  <footer>
+    <button id="shortcut" class="link">Alt+Shift+D — переключить</button>
+    <button id="reset" class="link">Сбросить</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
