@@ -1,9 +1,9 @@
-# Упакованное расширение — собирается из исходников, в репозитории не нужно
+# Packed extension — built from source, not kept in the repository
 *.zip
 *.crx
 *.pem
 
-# Мусор системы и редакторов
+# OS and editor clutter
 Thumbs.db
 desktop.ini
 .DS_Store

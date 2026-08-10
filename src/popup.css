@@ -38,7 +38,7 @@ h1 span {
   color: var(--muted);
 }
 
-/* Переключатель */
+/* Toggle switch */
 .switch input {
   position: absolute;
   opacity: 0;
@@ -70,7 +70,7 @@ h1 span {
 .switch input:checked + .track .knob { transform: translateX(16px); background: #202124; }
 .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Тело */
+/* Body */
 .body {
   margin-top: 14px;
   transition: opacity .15s;

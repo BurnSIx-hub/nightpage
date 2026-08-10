@@ -1,120 +1,122 @@
-# Тёмная тема для Google Docs
+# Nightpage
 
-Расширение для Chrome (Manifest V3), которое затемняет документы Google Docs
-вместе с интерфейсом: меню, панель инструментов, боковые панели, диалоги,
-комментарии и список документов.
+A Chrome extension (Manifest V3) that turns Google Docs dark — the document
+and the interface around it: menus, toolbar, sidebars, dialogs, comments and
+the document list.
 
-## Установка
+Unlike themes built from selector overrides, Nightpage does not know a single
+Google class name, so a redesign on their side cannot leave half the UI light.
+And unlike every dark theme that stops at the canvas, it gives the colors back
+to images inside the document.
 
-1. Открыть `chrome://extensions/`
-2. Включить **Режим разработчика** (переключатель справа сверху)
-3. **Загрузить распакованное расширение** → выбрать папку `gdocs-dark`
-4. Открыть или обновить вкладку с документом
+## Install
 
-После обновления файлов расширения нажать кнопку перезагрузки на карточке
-расширения и обновить вкладку Docs.
+1. Open `chrome://extensions/`
+2. Turn on **Developer mode** (top right)
+3. **Load unpacked** → pick the `nightpage` folder
+4. Open or reload a document
 
-## Управление
+After changing any file, hit reload on the extension card and refresh the Docs
+tab.
 
-Клик по иконке расширения открывает панель:
+## Controls
 
-- **переключатель** в заголовке — включить или выключить тему;
-- **Глубина чёрного** — насколько тёмным становится лист. Слева серый фон
-  (`#242424`), справа угольно-чёрный. Образец под ползунком показывает
-  результат сразу;
-- **Картинки в оригинале** — не инвертировать фотографии, схемы и аватары.
+Clicking the toolbar icon opens the panel:
 
-Горячая клавиша `Alt+Shift+D` включает и выключает тему. Переназначается
-на `chrome://extensions/shortcuts`.
+- the **switch** in the header turns the theme on and off;
+- **Black level** sets how dark the sheet gets — grey (`#242424`) at the left,
+  near-black at the right. The swatch below the slider previews the result;
+- **Keep image colors** restores photos, diagrams and avatars instead of
+  leaving them inverted.
 
-Настройки хранятся в `chrome.storage.sync` — переезжают вместе с профилем
-Chrome и применяются во всех открытых вкладках сразу, без перезагрузки.
+`Alt+Shift+D` toggles the theme. Rebind it at `chrome://extensions/shortcuts`.
 
-## Как это устроено
+Settings live in `chrome.storage.sync`, so they follow the Chrome profile and
+apply to every open tab at once, without a reload.
 
-С 2021 года Google Docs рисует текст документа не элементами DOM, а в
-`<canvas>`. Перекрасить буквы через CSS невозможно — их там нет как объектов.
-Поэтому расширение переворачивает всю страницу фильтром:
+## How it works
+
+Since 2021 Google Docs paints document text into a `<canvas>` rather than DOM
+nodes. Recoloring the letters with CSS is not possible — as elements they do
+not exist. So the page is flipped with a filter:
 
 ```css
-filter: contrast(var(--gdd-contrast)) invert(1) hue-rotate(180deg);
+filter: contrast(var(--np-contrast)) invert(1) hue-rotate(180deg);
 ```
 
-- `contrast()` сводит белый и чёрный к серым, чтобы после переворота лист был
-  мягко-тёмным, а не угольным. Этим и управляет ползунок;
-- `invert(1)` переворачивает светлоту;
-- `hue-rotate(180deg)` возвращает цветам исходный оттенок — без него синий
-  стал бы оранжевым.
+- `contrast()` runs first and pulls white and black toward grey, so the flipped
+  sheet reads as softly dark instead of pure black. This is what the slider
+  drives;
+- `invert(1)` performs the flip;
+- `hue-rotate(180deg)` puts hues back where they were — without it blue would
+  come out orange.
 
-Побочная выгода: под фильтр попадает и весь интерфейс Google, поэтому не нужно
-вести список из сотен селекторов, который ломается при каждом их редизайне.
+The side benefit is that the whole Google UI falls under the same filter, which
+is why no list of class names is needed and why redesigns do not break it.
 
-Картинки — отдельная история. В Chromium Docs рисует в canvas и их тоже, поэтому
-CSS до них не достаёт. Этим занимается `canvas-images.js`: он работает в мире
-страницы (`world: "MAIN"`) и подменяет `CanvasRenderingContext2D.drawImage`.
-Каждое изображение перед отрисовкой прогоняется через преобразование, обратное
-фильтру темы, — когда сверху ляжет фильтр страницы, картинка вернётся к
-исходному виду. Результат кэшируется в `WeakMap` по источнику, иначе пересчёт
-шёл бы на каждую перерисовку тайла.
+### Images
 
-Тайлы текста Docs тоже переносит через `drawImage`, но источником там служит
-canvas — по типу источника они и отсеиваются, обрабатываются только настоящие
-изображения.
+Images are a separate problem. On Chromium, Docs paints them into the canvas
+too, so CSS cannot reach them. `src/canvas-images.js` handles that: it runs in
+the page world (`world: "MAIN"`) and wraps
+`CanvasRenderingContext2D.drawImage`. Every image is run through the inverse of
+the theme's filter before it is painted, so once the page filter lands on top,
+the image is back to how it started. Results are cached in a `WeakMap` keyed by
+source — without it the work would repeat on every tile repaint.
 
-Элементам DOM (аватары соавторов, превью в меню) инверсия отменяется проще —
-собственным CSS-фильтром: дочерний фильтр применяется раньше родительского.
+Docs moves text tiles through `drawImage` as well, but those sources are
+canvases; the source type is what separates them, and only real images are
+touched.
 
-CSS подключается на `document_start`, поэтому белой вспышки при открытии
-документа нет. Скрипт лишь снимает тему, если она выключена, — в этом случае
-возможен короткий тёмный проблеск.
+DOM elements — collaborator avatars, menu previews — are handled the simpler
+way, with a CSS filter of their own: a child filter runs before its parent's.
 
-## Что не получится
+The two content scripts live in different worlds and never talk directly.
+`content.js` sits in the isolated world and writes state into classes and a
+custom property on `<html>`; `canvas-images.js` reads it from there through a
+`MutationObserver`. No message passing needed — `<html>` is shared anyway.
 
-- **Точное восстановление насыщенных цветов.** `hue-rotate(180deg)` обратим как
-  матрица (проверено: `H·H` — единичная), но насыщенные цвета он выносит за
-  пределы гаммы, и там они обрезаются. Обратное преобразование эту потерю уже
-  не восполнит. На замерах: зелёный `#43a047` → `#45a248`, синий `#1e88e5` →
-  `#208adb`, коричневый `#6d4c41` → `#6e4d42` — то есть средние тона, зелень,
-  синева и телесные оттенки возвращаются практически точно. А яркий жёлтый
-  `#fdd835` уходит в `#e9c4ae`, красный `#e53935` — в `#c15652`.
+## Known limits
 
-  Чем выше «Глубина чёрного», тем меньше расхождение: при максимуме синий
-  восстанавливается до `#1e88e6`, то есть в единицу. Компенсация одной
-  матрицей `feColorMatrix` вместо цепочки фильтров даёт выигрыш 0.3 единицы
-  из 255 — не окупает усложнения, поэтому в коде цепочка.
-- **Документ, состоящий из фотографий.** Если снимков много и цвет важен, тему
-  на такой вкладке проще выключить целиком: приглушённые красные и жёлтые
-  заметны именно на фотографиях.
-- **Печать.** Правило `@media print` отключает фильтр, так что на бумагу и в PDF
-  уходит обычный светлый документ.
-- **Производительность.** Фильтр на корневом элементе заставляет браузер
-  перерисовывать композитный слой. На слабой встроенной графике на очень
-  больших документах возможна лёгкая задержка при наборе.
+- **Saturated colors do not come back exactly.** `hue-rotate(180deg)` is
+  invertible as a matrix (verified: `H·H` is the identity), but it pushes
+  saturated colors outside the gamut, where they clip. The inverse cannot
+  recover what was clipped. Measured round trips: green `#43a047` → `#45a248`,
+  blue `#1e88e5` → `#208adb`, brown `#6d4c41` → `#6e4d42` — mid tones, greens,
+  blues and skin tones return within a unit or two. Vivid yellow `#fdd835`
+  lands on `#e9c4ae` and red `#e53935` on `#c15652`.
 
-## Файлы
+  Raising **Black level** narrows the gap: at maximum, blue returns to
+  `#1e88e6`. Doing the compensation as a single `feColorMatrix` instead of a
+  filter chain buys 0.3 of a unit out of 255 — not worth the complexity, so the
+  code uses the chain.
+- **Documents that are mostly photographs.** If color fidelity matters there,
+  turn the theme off for that tab; muted reds and yellows are most visible on
+  photos.
+- **Printing** is untouched — an `@media print` rule drops the filter, so paper
+  and PDF export get the normal light document.
+- **Performance.** A filter on the root element makes the browser repaint a
+  composited layer. On weak integrated graphics, very large documents may feel
+  slightly less responsive while typing.
+
+## Files
 
 ```
-gdocs-dark/
+nightpage/
 ├── manifest.json
-├── icons/               иконки 16/32/48/128
+├── icons/               16/32/48/128
 └── src/
-    ├── dark.css         сам фильтр и точечные правки
-    ├── content.js       настройки → классы и переменная на <html>
-    ├── canvas-images.js перехват drawImage в мире страницы
-    ├── background.js    значения по умолчанию, горячая клавиша
-    └── popup.*          панель управления
+    ├── dark.css         the filter and the fixes on top of it
+    ├── content.js       settings → classes and a custom property on <html>
+    ├── canvas-images.js drawImage interception, page world
+    ├── background.js    defaults and the keyboard shortcut
+    └── popup.*          the control panel
 ```
 
-Два скрипта содержимого работают в разных мирах и не общаются напрямую:
-`content.js` живёт в изолированном мире и пишет состояние в классы и
-CSS-переменную на `<html>`, а `canvas-images.js` из мира страницы читает
-их оттуда же через `MutationObserver`. Обмен сообщениями не нужен,
-`<html>` и так общий.
+## Other Google services
 
-## Другие сервисы Google
-
-Расширение работает только на `https://docs.google.com/document/*`. Чтобы
-затемнить Таблицы и Презентации, добавьте адреса в `matches` в `manifest.json`:
+Nightpage only runs on `https://docs.google.com/document/*`. To darken Sheets
+and Slides, add them to `matches` in `manifest.json`:
 
 ```json
 "matches": [
@@ -124,9 +126,13 @@ CSS-переменную на `<html>`, а `canvas-images.js` из мира ст
 ]
 ```
 
-Для Таблиц это менее удобно: инверсия перекрасит и заливки ячеек, а условное
-форматирование потеряет привычный смысл цветов.
+Sheets is the less comfortable case: inversion repaints cell fills too, and
+conditional formatting loses the meaning its colors carried.
 
-## Лицензия
+## License
 
 [MIT](LICENSE).
+
+Not affiliated with, endorsed by, or sponsored by Google. Google Docs is a
+trademark of Google LLC, used here only to describe what this extension works
+with.

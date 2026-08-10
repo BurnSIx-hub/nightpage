@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Тёмная тема для Google Docs",
+  "name": "Nightpage — Dark Mode for Documents",
   "version": "1.0.0",
-  "description": "Тёмное оформление документов и интерфейса Google Docs с регулировкой глубины чёрного.",
+  "description": "Dark theme for Google Docs that keeps images looking right instead of inverted.",
   "permissions": ["storage"],
   "content_scripts": [
     {
@@ -24,7 +24,7 @@
     "service_worker": "src/background.js"
   },
   "action": {
-    "default_title": "Тёмная тема для Google Docs",
+    "default_title": "Nightpage",
     "default_popup": "src/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -42,7 +42,7 @@
   "commands": {
     "toggle-dark": {
       "suggested_key": { "default": "Alt+Shift+D" },
-      "description": "Включить или выключить тёмную тему"
+      "description": "Turn the dark theme on or off"
     }
   }
 }

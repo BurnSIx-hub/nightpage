@@ -1,81 +1,79 @@
 /* ============================================================
-   Тёмная тема для Google Docs
+   Nightpage — dark mode for Google Docs
    ------------------------------------------------------------
-   Почему инверсия, а не переопределение цветов.
+   Why inversion rather than recoloring.
 
-   С 2021 года Google Docs рисует текст документа не элементами
-   DOM, а в <canvas>. До цвета букв через CSS не дотянуться —
-   их там просто нет. Поэтому весь документ переворачивается
-   фильтром: белый лист становится тёмным, чёрные буквы светлыми.
-   Заодно тем же фильтром накрывается интерфейс, и не нужно
-   вручную вести список из сотен селекторов Google, который
-   ломается при каждом их редизайне.
+   Since 2021 Google Docs paints document text into a <canvas>
+   instead of DOM nodes. There are no glyph elements for CSS to
+   reach. So the page is flipped with a filter: the white sheet
+   turns dark, the black letters turn light. The same filter
+   covers the surrounding UI, which spares us a list of hundreds
+   of Google class names that breaks on every redesign.
 
-   Порядок функций в filter важен:
-     contrast() — сначала сводим белый и чёрный к серым, чтобы
-                  после переворота лист был не угольно-чёрным,
-                  а мягко-тёмным;
-     invert(1)  — собственно переворот;
-     hue-rotate(180deg) — возвращает цветам исходный оттенок
-                  (без него синий стал бы оранжевым).
+   The order of the filter functions matters:
+     contrast()  pulls white and black toward grey first, so the
+                 flipped sheet reads as softly dark rather than
+                 pure black;
+     invert(1)   performs the flip;
+     hue-rotate(180deg) puts hues back where they were — without
+                 it blue would come out orange.
    ============================================================ */
 
 :root {
-  /* Меняется из popup. Чем ближе к 1, тем чернее лист.
-     0.72 → лист #242424, 1.0 → лист #000000. */
-  --gdd-contrast: 0.804;
+  /* Set from the popup. The closer to 1, the blacker the sheet:
+     0.72 gives a #242424 sheet, 1.0 gives #000000. */
+  --np-contrast: 0.804;
 }
 
-html:not(.gdd-off) {
-  /* Пока приложение не отрисовалось, Docs держит белый фон.
-     Явный белый здесь → после инверсии тёмный, без вспышки. */
+html:not(.np-off) {
+  /* Docs keeps a white background until the app paints. Stating
+     it here means it inverts to dark with no white flash. */
   background-color: #ffffff;
-  filter: contrast(var(--gdd-contrast)) invert(1) hue-rotate(180deg);
+  filter: contrast(var(--np-contrast)) invert(1) hue-rotate(180deg);
 }
 
-/* Печать оставляем как есть: иначе на бумагу уйдут чёрные листы. */
+/* Leave printing alone, or black sheets go to paper. */
 @media print {
-  html:not(.gdd-off) {
+  html:not(.np-off) {
     filter: none;
     background-color: transparent;
   }
 }
 
 /* ------------------------------------------------------------
-   Картинки, видео и аватары, оставшиеся элементами DOM.
+   Images, video and avatars that are still DOM elements.
 
-   Дочерний фильтр применяется до родительского, поэтому
-   invert(1) отменяет внешнюю инверсию, а contrast(1/x) —
-   срезанный контраст.
+   A child filter runs before its parent's, so invert(1) cancels
+   the outer inversion and contrast(1/x) restores the contrast
+   the theme took away.
 
-   Здесь только интерфейс: аватары соавторов, превью в меню,
-   вставленные видео. Картинки внутри самого документа Docs
-   рисует в canvas, до них CSS не достаёт — ими занимается
-   canvas-images.js.
+   This covers the UI only: collaborator avatars, menu previews,
+   embedded video. Images inside the document itself are painted
+   into the canvas, out of reach of CSS — canvas-images.js
+   handles those.
    ------------------------------------------------------------ */
-html.gdd-keep-media:not(.gdd-off) :is(
+html.np-keep-media:not(.np-off) :is(
   img[src*="googleusercontent.com"],
   img[src^="blob:"],
   video
 ) {
-  filter: invert(1) contrast(calc(1 / var(--gdd-contrast))) hue-rotate(180deg);
+  filter: invert(1) contrast(calc(1 / var(--np-contrast))) hue-rotate(180deg);
 }
 
 /* ------------------------------------------------------------
-   Точечные правки поверх инверсии.
+   Fixes layered on top of the inversion.
    ------------------------------------------------------------ */
 
-/* Базовую отрисовку держим светлой намеренно. Если Chrome или
-   система стоят в тёмной теме, нативные элементы (прокрутка,
-   поля ввода) отрисовались бы тёмными — и инверсия сделала бы
-   их светлыми посреди тёмного интерфейса. Инвертировать нужно
-   светлый оригинал. */
-html:not(.gdd-off) {
+/* Base rendering is kept light on purpose. If Chrome or the OS
+   is set to dark, native widgets (scrollbars, inputs) would be
+   drawn dark and the inversion would turn them light in the
+   middle of a dark UI. What we invert has to be the light one. */
+html:not(.np-off) {
   color-scheme: light;
 }
 
-/* Тень листа после инверсии превращается в светлый ореол
-   вокруг страницы. На тёмном фоне она не нужна. */
-html:not(.gdd-off) :is(.kix-page, .kix-page-paginated) {
+/* Inverted, the sheet's drop shadow becomes a pale halo around
+   the page. On a dark background it earns nothing. */
+html:not(.np-off) :is(.kix-page, .kix-page-paginated) {
   box-shadow: none !important;
 }

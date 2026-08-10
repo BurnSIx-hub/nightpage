@@ -8,11 +8,11 @@ const keepMedia = $('keepMedia');
 const preview = $('preview');
 const body = $('body');
 
-/* То же преобразование, что в content.js: 0..100 → 0.72..1.0 */
+/* The same mapping content.js uses: 0..100 → 0.72..1.0 */
 const contrastFor = (v) => 0.72 + Math.min(100, Math.max(0, v)) * 0.0028;
 
-/* Куда после contrast() + invert() уедут белый лист и чёрные буквы.
-   Формула: значение v → 255 - ((v - 127.5) * c + 127.5). */
+/* Where contrast() + invert() will land the white sheet and the black
+   letters. Per channel: v → 255 - ((v - 127.5) * c + 127.5). */
 function paint(v) {
   const c = contrastFor(v);
   const page = Math.round(127.5 * (1 - c));

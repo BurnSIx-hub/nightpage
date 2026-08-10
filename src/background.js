@@ -1,6 +1,6 @@
-/* Фиксирует значения по умолчанию при установке и обрабатывает
-   горячую клавишу. Всё остальное состояние живёт в chrome.storage,
-   так что воркеру можно спокойно засыпать. */
+/* Pins the defaults on install and handles the keyboard shortcut.
+   Every other piece of state lives in chrome.storage, so the worker
+   is free to go to sleep. */
 
 const DEFAULTS = { enabled: true, intensity: 30, keepMedia: true };
 

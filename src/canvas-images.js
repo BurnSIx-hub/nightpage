@@ -1,38 +1,39 @@
-/* Возврат картинкам исходного вида — в мире страницы (world: MAIN).
+/* Giving images their colors back — runs in the page world (world: MAIN).
 
-   В Chromium Google Docs рисует в <canvas> всё, включая картинки:
-   отдельных <img> для них в DOM нет, и CSS до них не дотянуться.
-   Поэтому здесь перехватывается сам вызов drawImage: источник заранее
-   прогоняется через преобразование, обратное фильтру темы. Когда сверху
-   ляжет фильтр страницы, картинка вернётся к исходному виду.
+   On Chromium, Google Docs paints everything into a <canvas>, images
+   included: there are no <img> elements for them in the DOM and CSS
+   cannot reach them. So the drawImage call itself is intercepted here.
+   Each source is run through the inverse of the theme's filter before
+   it is painted; once the page filter lands on top, the image comes
+   back to how it started.
 
-   Тайлы текста Docs тоже переносит через drawImage, но источником там
-   служит canvas — по типу источника они и отсеиваются. Трогаем только
-   настоящие изображения. */
+   Docs moves text tiles through drawImage as well, but those sources
+   are canvases — the source type is what separates them. Only real
+   images are touched. */
 
 (() => {
   const CANVAS_DRAW = CanvasRenderingContext2D.prototype.drawImage;
   const root = document.documentElement;
 
-  /* Состояние читаем прямо с <html>: классы и переменную туда пишет
-     content.js. Пересчитываем по мутации, а не на каждый drawImage —
-     Docs зовёт его сотни раз за перерисовку. */
+  /* State is read straight off <html>, where content.js writes it.
+     Recomputed on mutation rather than on every drawImage — Docs
+     calls that hundreds of times per repaint. */
   const state = { contrast: null };
 
   function refresh() {
-    const on = !root.classList.contains('gdd-off') &&
-               root.classList.contains('gdd-keep-media');
+    const on = !root.classList.contains('np-off') &&
+               root.classList.contains('np-keep-media');
     const prev = state.contrast;
 
     if (!on) {
       state.contrast = null;
     } else {
-      const raw = parseFloat(root.style.getPropertyValue('--gdd-contrast'));
+      const raw = parseFloat(root.style.getPropertyValue('--np-contrast'));
       state.contrast = raw > 0 ? raw : 0.804;
     }
 
-    /* Уже нарисованные тайлы сами не обновятся. Docs перерисовывает их
-       по изменению размеров окна — этим и пользуемся. */
+    /* Tiles already painted will not refresh on their own. Docs
+       repaints them on a size change, so that is what we trigger. */
     if (prev !== state.contrast) {
       window.dispatchEvent(new Event('resize'));
     }
@@ -44,18 +45,19 @@
     attributeFilter: ['class', 'style']
   });
 
-  /* Преобразование, обратное фильтру темы contrast(c) invert(1) hue-rotate(180deg):
-     тот же набор в обратном порядке, contrast компенсируется множителем 1/c.
+  /* The inverse of the theme's contrast(c) invert(1) hue-rotate(180deg):
+     the same functions in reverse, with contrast compensated by 1/c.
 
-     Точность неполная. hue-rotate выносит насыщенные цвета за пределы
-     гаммы, и там они обрезаются — это свойство самого фильтра, а не ошибка
-     компенсации. Средние тона, зелёный, синий и телесные оттенки
-     возвращаются практически точно; яркие красный и жёлтый остаются
-     приглушёнными. Чем выше «глубина чёрного», тем меньше расхождение. */
+     Recovery is not exact. hue-rotate is invertible as a matrix (H·H is
+     the identity), but it pushes saturated colors outside the gamut and
+     they clip there — a property of the filter, not a flaw in the
+     compensation. Mid tones, greens, blues and skin tones come back
+     within a unit or two; vivid reds and yellows stay muted. The higher
+     the black level, the smaller the gap. */
   const filterFor = (c) =>
     'hue-rotate(180deg) invert(1) contrast(' + (1 / c).toFixed(4) + ')';
 
-  const cache = new WeakMap();   // источник → { contrast, canvas }
+  const cache = new WeakMap();   // source → { contrast, canvas }
 
   function preInverted(source, contrast) {
     const cached = cache.get(source);
@@ -63,7 +65,7 @@
 
     const w = source.naturalWidth || source.width;
     const h = source.naturalHeight || source.height;
-    if (!w || !h) return null;               // ещё не загрузилось
+    if (!w || !h) return null;               // not loaded yet
 
     const buffer = document.createElement('canvas');
     buffer.width = w;
@@ -81,8 +83,9 @@
     (typeof SVGImageElement !== 'undefined' && s instanceof SVGImageElement) ||
     (typeof ImageBitmap !== 'undefined' && s instanceof ImageBitmap);
 
-  /* Каждый контекст патчится своим оригиналом: подсунуть методу
-     OffscreenCanvas функцию от обычного canvas нельзя — упадёт. */
+  /* Each context is wrapped around its own original: handing the
+     OffscreenCanvas method a function taken from the regular canvas
+     would throw. */
   function wrap(original) {
     return function drawImage(source, ...rest) {
       const contrast = state.contrast;
@@ -91,8 +94,8 @@
           const pre = preInverted(source, contrast);
           if (pre) return original.call(this, pre, ...rest);
         } catch (e) {
-          /* Что угодно пошло не так — рисуем как рисовалось.
-             Сломать документ хуже, чем показать картинку в негативе. */
+          /* Whatever went wrong, paint the way Docs meant to.
+             Breaking the document is worse than a negative image. */
         }
       }
       return original.call(this, source, ...rest);
@@ -101,7 +104,7 @@
 
   CanvasRenderingContext2D.prototype.drawImage = wrap(CANVAS_DRAW);
 
-  /* На случай, если Docs рисует через OffscreenCanvas в основном потоке. */
+  /* In case Docs paints through an OffscreenCanvas on the main thread. */
   if (typeof OffscreenCanvasRenderingContext2D !== 'undefined') {
     const offscreen = OffscreenCanvasRenderingContext2D.prototype;
     offscreen.drawImage = wrap(offscreen.drawImage);
