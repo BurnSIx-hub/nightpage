@@ -102,3 +102,47 @@ html:not(.np-off) {
 html:not(.np-off) :is(.kix-page, .kix-page-paginated) {
   box-shadow: none !important;
 }
+
+/* ------------------------------------------------------------
+   The colour picker.
+
+   Swatches are divs with an inline background-color, so the page
+   filter scrambles them: yellow reads as beige, blue as almost
+   black. A compensating filter cannot fix it — pure colours sit
+   at the corners of the gamut and clamping each channel on its
+   own is what bends the hue.
+
+   Instead palette.js works out a fill that displays as the right
+   hue and hands it over in --np-swatch, painted here as an
+   overlay. Docs' own background-color is left alone; see the
+   comment in palette.js for why that matters.
+
+   The overlay hides the tick Docs draws on the selected swatch
+   as a background-image, so it is redrawn below.
+   ------------------------------------------------------------ */
+html:not(.np-off) .docs-material-colorpalette-colorswatch[data-np-source]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--np-swatch);
+}
+
+html:not(.np-off) .docs-material-colorpalette-cell-selected
+  .docs-material-colorpalette-colorswatch[data-np-source]::after {
+  content: "\2713";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--np-check-on-light);
+}
+
+/* Dark swatches carry Google's own marker class, so the tick can
+   follow it instead of us guessing the brightness again. */
+html:not(.np-off) .docs-material-colorpalette-cell-selected
+  .docs-material-colorpalette-colorswatch-dark[data-np-source]::after {
+  color: var(--np-check-on-dark);
+}

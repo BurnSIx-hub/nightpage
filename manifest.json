@@ -8,7 +8,7 @@
     {
       "matches": ["https://docs.google.com/document/*"],
       "css": ["src/dark.css"],
-      "js": ["src/content.js"],
+      "js": ["src/content.js", "src/palette.js"],
       "run_at": "document_start",
       "all_frames": false
     },
