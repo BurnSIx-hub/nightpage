@@ -1,0 +1,18 @@
+/* ============================================================
+   Base coat for the recolouring engine.
+
+   Injected at document_start so the page is already dark while
+   recolor.js is still walking it, instead of flashing white
+   first. Deliberately without !important: the engine reads
+   computed colours, and shouting over the site would hide the
+   very values it needs to map.
+   ============================================================ */
+
+html:not(.np-off) {
+  color-scheme: dark;
+  background-color: #17191c;
+}
+
+html:not(.np-off) body {
+  background-color: #17191c;
+}

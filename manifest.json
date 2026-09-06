@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Nightpage — Dark Mode for Documents",
-  "version": "1.0.0",
-  "description": "Dark theme for Google Docs that keeps images looking right instead of inverted.",
+  "name": "Nightpage — Dark Mode",
+  "version": "1.1.0",
+  "description": "Dark theme for Google Docs and Amazon that leaves photographs and product colours alone.",
   "permissions": ["storage"],
   "content_scripts": [
     {
@@ -17,6 +17,31 @@
       "js": ["src/canvas-images.js"],
       "run_at": "document_start",
       "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.es/*",
+        "*://*.amazon.nl/*",
+        "*://*.amazon.pl/*",
+        "*://*.amazon.se/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.com.mx/*",
+        "*://*.amazon.com.br/*",
+        "*://*.amazon.com.au/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.ae/*",
+        "*://*.amazon.com.tr/*"
+      ],
+      "css": ["src/recolor.css"],
+      "js": ["src/recolor.js"],
+      "run_at": "document_start",
       "all_frames": false
     }
   ],
