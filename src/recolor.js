@@ -115,6 +115,14 @@
     ? 'rgb(' + rgb.join(', ') + ')'
     : 'rgba(' + rgb.join(', ') + ', ' + a + ')';
 
+  const mapGradient = (value) => value.replace(/rgba?\([^)]*\)/g, (found) => {
+    const rgba = parse(found);
+    return rgba ? asCss(mapSurface(rgba), rgba[3]) : found;
+  });
+
+  const isLight = (rgba) => rgba && rgba[3] > 0.05 &&
+    (rgba[0] + rgba[1] + rgba[2]) / 3 > 120;
+
   /* What we last wrote, so a value can never be mapped twice. If the
      site later sets a colour of its own the computed value stops
      matching and the element is worked out again from scratch. */
@@ -137,9 +145,75 @@
     touched.add(el);
   }
 
+  /* Pseudo-elements take no inline style, so the few that paint
+     something light get a rule of their own in a sheet we own. They are
+     keyed by tag and class, because pseudo styling comes from CSS rules
+     and every element with the same signature therefore shares one
+     verdict. Measured on an Amazon product page: 1237 signatures, of
+     which 5 paint anything light — among them the divider whose white
+     ::after gradient lay across the section headings as a bright band. */
+  const pseudoIndex = new Map();
+  let ownSheet = null;
+
+  function sheetFor() {
+    if (ownSheet) return ownSheet;
+    const style = document.createElement('style');
+    style.id = 'np-pseudo';
+    (document.head || root).appendChild(style);
+    ownSheet = style.sheet;
+    return ownSheet;
+  }
+
+  function pseudoPaints(cs) {
+    if (cs.content === 'none') return null;
+    const decls = [];
+    const bi = cs.backgroundImage;
+    if (bi !== 'none' && bi.indexOf('gradient') !== -1) {
+      const stops = bi.match(/rgba?\([^)]*\)/g) || [];
+      if (stops.some((s) => isLight(parse(s)))) {
+        decls.push('background-image:' + mapGradient(bi) + ' !important');
+      }
+    }
+    const bg = parse(cs.backgroundColor);
+    if (isLight(bg)) {
+      decls.push('background-color:' + asCss(mapSurface(bg), bg[3]) + ' !important');
+    }
+    return decls.length ? decls.join(';') : null;
+  }
+
+  function pseudo(el) {
+    const sig = el.tagName + '|' + String(el.className);
+    let idx = pseudoIndex.get(sig);
+
+    if (idx === undefined) {
+      const rules = [];
+      ['::before', '::after'].forEach((part) => {
+        const decl = pseudoPaints(getComputedStyle(el, part));
+        if (decl) rules.push([part, decl]);
+      });
+      idx = null;
+      if (rules.length) {
+        idx = pseudoIndex.size;
+        const s = sheetFor();
+        rules.forEach(([part, decl]) => {
+          try {
+            s.insertRule('[data-np-pe="' + idx + '"]' + part + '{' + decl + '}', s.cssRules.length);
+          } catch (e) { /* нестандартный селектор — пропускаем */ }
+        });
+      }
+      pseudoIndex.set(sig, idx);
+    }
+
+    if (idx !== null && el.getAttribute('data-np-pe') !== String(idx)) {
+      el.setAttribute('data-np-pe', String(idx));
+      touched.add(el);
+    }
+  }
+
   function process(el) {
     if (el.tagName === 'IMG') { frame(el); return; }
     if (SKIP.has(el.tagName)) return;
+    pseudo(el);
 
     const cs = getComputedStyle(el);
     const was = applied.get(el) || {};
@@ -167,10 +241,7 @@
     if (grad === was.grad) {
       now.grad = was.grad;
     } else if (grad.indexOf('gradient') !== -1) {
-      const out = grad.replace(/rgba?\([^)]*\)/g, (found) => {
-        const rgba = parse(found);
-        return rgba ? asCss(mapSurface(rgba), rgba[3]) : found;
-      });
+      const out = mapGradient(grad);
       if (out !== grad) {
         el.style.setProperty('background-image', out, 'important');
         now.grad = out;
@@ -196,6 +267,18 @@
           now[prop] = out;
         });
       }
+    }
+
+    /* Shops knock the white background out of a product shot with
+       mix-blend-mode: multiply. Over the light card it was designed for
+       this is invisible; over a dark one it swallows the whole picture.
+       Amazon does exactly that in "frequently bought together", and it
+       is what made those photos look like negatives — the pixels were
+       never touched, the backdrop under them was. */
+    const blend = cs.mixBlendMode;
+    if (blend === 'multiply' || blend === 'darken') {
+      el.style.setProperty('mix-blend-mode', 'normal', 'important');
+      now.blend = true;
     }
 
     const ink = cs.color;
@@ -236,7 +319,7 @@
       }
     }
 
-    if (now.bg || now.ink || now.edge || now.grad || now.fill || now.stroke) {
+    if (now.bg || now.ink || now.edge || now.grad || now.fill || now.stroke || now.blend) {
       touched.add(el);
     }
     applied.set(el, now);
@@ -306,9 +389,15 @@
     }
     touched.forEach((el) => {
       ['background-color', 'color', 'border-color', 'background-image',
-       'box-shadow', 'fill', 'stroke'].forEach((p) => el.style.removeProperty(p));
+       'box-shadow', 'fill', 'stroke', 'mix-blend-mode']
+        .forEach((p) => el.style.removeProperty(p));
+      el.removeAttribute('data-np-pe');
     });
     touched.clear();
+    const style = document.getElementById('np-pseudo');
+    if (style) style.remove();
+    ownSheet = null;
+    pseudoIndex.clear();
   }
 
   function apply(settings) {
