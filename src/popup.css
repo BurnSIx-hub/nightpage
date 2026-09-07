@@ -46,10 +46,17 @@ h1 span {
   height: 0;
 }
 
+/* The knob is seated by padding and centred by flex, not by a margin
+   of its own. A margin escapes a box that has no padding or border to
+   contain it, and this one did: it pushed the track down instead of the
+   knob in, leaving the knob flush against the top edge with a four-pixel
+   gap beneath it. */
 .track {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 36px;
   height: 20px;
+  padding: 0 2px;
   border-radius: 10px;
   background: #5f6368;
   transition: background .15s;
@@ -57,10 +64,8 @@ h1 span {
 }
 
 .knob {
-  display: block;
   width: 16px;
   height: 16px;
-  margin: 2px;
   border-radius: 50%;
   background: #e8eaed;
   transition: transform .15s;

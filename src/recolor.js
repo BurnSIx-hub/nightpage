@@ -130,6 +130,57 @@
   const touched = new Set();
   const framed = new WeakSet();
 
+  /* Regions painted with a picture. Anything lying on one is left
+     exactly as the site drew it: the artwork is not ours to read, so we
+     cannot tell whether lightening the text on it helps or hides it.
+     Amazon's deal cards are precisely this — the colour is a background
+     image on one layer and the heading is HTML on another, which is how
+     "Most loved picks for you" ended up pale on pale.
+
+     Geometry rather than ancestry, because the artwork layer is usually
+     a sibling of the text and not its parent. Rectangles are stored
+     relative to the document so scrolling cannot invalidate them, and
+     anything covering half the viewport is ignored — a full-page
+     backdrop would otherwise switch the whole theme off. */
+  let artwork = [];
+
+  function rememberArtwork(el) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40) return;
+    if (r.width * r.height > innerWidth * innerHeight * 0.5) return;
+    if (artwork.length > 400) return;
+    artwork.push({
+      left: r.left + scrollX, right: r.right + scrollX,
+      top: r.top + scrollY, bottom: r.bottom + scrollY
+    });
+  }
+
+  function insideArtwork(el) {
+    if (!artwork.length) return false;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return false;
+    const x = r.left + r.width / 2 + scrollX;
+    const y = r.top + r.height / 2 + scrollY;
+    for (let i = 0; i < artwork.length; i++) {
+      const a = artwork[i];
+      if (x >= a.left && x <= a.right && y >= a.top && y <= a.bottom) return true;
+    }
+    return false;
+  }
+
+  /* An element can be judged artwork-covered only after the layer above
+     it has been seen, so a later pass may have to take back what an
+     earlier one wrote. */
+  function unpaint(el) {
+    const was = applied.get(el);
+    if (!was) return;
+    if (was.bg) el.style.removeProperty('background-color');
+    if (was.ink) el.style.removeProperty('color');
+    if (was.edge) el.style.removeProperty('border-color');
+    if (was.grad) el.style.removeProperty('background-image');
+    applied.set(el, {});
+  }
+
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /* A dark product shot used to be framed by the light card behind it.
@@ -211,11 +262,34 @@
   }
 
   function process(el) {
-    if (el.tagName === 'IMG') { frame(el); return; }
-    if (SKIP.has(el.tagName)) return;
-    pseudo(el);
+    const media = el.tagName === 'IMG';
+    if (SKIP.has(el.tagName) && !media) return;
 
     const cs = getComputedStyle(el);
+
+    /* Blending is undone first, and for images as well as wrappers.
+       Shops knock the white background out of a product shot with
+       mix-blend-mode: multiply — invisible over the light card it was
+       drawn for, fatal over a dark one. Jumping straight to the hairline
+       left 32 images on Amazon's home page still multiplying against a
+       dark card, which is exactly what dimmed them. */
+    const blend = cs.mixBlendMode;
+    if (blend === 'multiply' || blend === 'darken') {
+      el.style.setProperty('mix-blend-mode', 'normal', 'important');
+      touched.add(el);
+    }
+
+    if (media) { frame(el); return; }
+    pseudo(el);
+
+    const backdrop = cs.backgroundImage;
+    if (backdrop !== 'none' && backdrop.indexOf('url(') !== -1) {
+      rememberArtwork(el);
+    } else if (insideArtwork(el)) {
+      unpaint(el);
+      return;
+    }
+
     const was = applied.get(el) || {};
     const now = {};
 
@@ -269,18 +343,6 @@
       }
     }
 
-    /* Shops knock the white background out of a product shot with
-       mix-blend-mode: multiply. Over the light card it was designed for
-       this is invisible; over a dark one it swallows the whole picture.
-       Amazon does exactly that in "frequently bought together", and it
-       is what made those photos look like negatives — the pixels were
-       never touched, the backdrop under them was. */
-    const blend = cs.mixBlendMode;
-    if (blend === 'multiply' || blend === 'darken') {
-      el.style.setProperty('mix-blend-mode', 'normal', 'important');
-      now.blend = true;
-    }
-
     const ink = cs.color;
     if (ink === was.ink) {
       now.ink = was.ink;
@@ -319,7 +381,7 @@
       }
     }
 
-    if (now.bg || now.ink || now.edge || now.grad || now.fill || now.stroke || now.blend) {
+    if (now.bg || now.ink || now.edge || now.grad || now.fill || now.stroke) {
       touched.add(el);
     }
     applied.set(el, now);
@@ -327,6 +389,9 @@
 
   function walk(node) {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
+    /* A pass over the whole document rebuilds the map of artwork; a pass
+       over a subtree that has just arrived adds to the one we have. */
+    if (node === root) artwork = [];
     process(node);
     const kids = node.children;
     for (let i = 0; i < kids.length; i++) walk(kids[i]);
@@ -338,6 +403,7 @@
   let scheduled = false;
 
   function flush() {
+    if (!scheduled) return;
     scheduled = false;
     const batch = queue;
     queue = new Set();
@@ -348,7 +414,13 @@
     queue.add(el);
     if (scheduled) return;
     scheduled = true;
+    /* A tab that is not being looked at gets no animation frames at all,
+       so on its own the queue would sit untouched until the tab came
+       forward — and then repaint in front of the reader. The timer is
+       the fallback; whichever arrives first does the work and the other
+       finds nothing scheduled. */
     requestAnimationFrame(flush);
+    setTimeout(flush, 200);
   }
 
   let observer = null;
@@ -396,6 +468,13 @@
        for their hairline before then. */
     document.addEventListener('DOMContentLoaded', () => schedule(root), { once: true });
     window.addEventListener('load', () => schedule(root), { once: true });
+
+    /* Layout is measured for the artwork map and the hairlines, and a
+       hidden tab has no layout worth measuring. Look again when it is
+       shown. */
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) schedule(root);
+    });
   }
 
   function stop() {
