@@ -15,4 +15,5 @@ html:not(.np-off) {
 
 html:not(.np-off) body {
   background-color: #17191c;
+  color: #d8dadb;
 }

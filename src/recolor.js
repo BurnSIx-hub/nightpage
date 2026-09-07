@@ -353,15 +353,28 @@
 
   let observer = null;
 
+  /* An element parsed before its stylesheet arrived was measured against
+     the browser's defaults, and a stylesheet landing later fires no
+     mutation of its own. So every sheet that loads asks for another
+     pass. */
+  function watchSheet(node) {
+    if (node.tagName !== 'LINK') return;
+    if (String(node.rel || '').toLowerCase().indexOf('stylesheet') === -1) return;
+    node.addEventListener('load', () => schedule(root), { once: true });
+  }
+
   function start() {
     root.classList.remove('np-off');
     walk(root);
     if (observer) return;
+
     observer = new MutationObserver((records) => {
       for (const record of records) {
         if (record.type === 'childList') {
           record.addedNodes.forEach((n) => {
-            if (n.nodeType === Node.ELEMENT_NODE) schedule(n);
+            if (n.nodeType !== Node.ELEMENT_NODE) return;
+            watchSheet(n);
+            schedule(n);
           });
         } else if (record.target.nodeType === Node.ELEMENT_NODE) {
           schedule(record.target);
@@ -375,10 +388,14 @@
       attributeFilter: ['style', 'class', 'src']
     });
 
-    /* Images have no size until they arrive, and a photograph cannot be
-       measured for its hairline before then. One more pass once the
-       page has finished loading catches them. */
-    window.addEventListener('load', () => { if (observer) walk(root); }, { once: true });
+    document.querySelectorAll('link').forEach(watchSheet);
+
+    /* Two more passes at the loading milestones. The first catches
+       anything whose styling settled late; the second catches images,
+       which have no size until they arrive and so cannot be measured
+       for their hairline before then. */
+    document.addEventListener('DOMContentLoaded', () => schedule(root), { once: true });
+    window.addEventListener('load', () => schedule(root), { once: true });
   }
 
   function stop() {
@@ -405,22 +422,22 @@
     if (settings.enabled) start(); else stop();
   }
 
-  function ready(fn) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fn, { once: true });
-    } else {
-      fn();
-    }
-  }
+  /* Nothing here waits for DOMContentLoaded. The walk starts the moment
+     the settings arrive and the observer picks elements up as the parser
+     appends them, so the page darkens while it is still being built.
+     Waiting for the document to finish first cost one to two seconds of
+     the site's own light theme on Amazon. Docs never showed that,
+     because its darkness comes from a stylesheet with no script in the
+     path at all. */
 
   /* With no extension around it — dropped straight into a page to try
      it out — fall back to the defaults. */
   if (typeof chrome === 'undefined' || !chrome.storage) {
-    ready(() => apply(DEFAULTS));
+    apply(DEFAULTS);
     return;
   }
 
-  chrome.storage.sync.get(DEFAULTS).then((s) => ready(() => apply(s)));
+  chrome.storage.sync.get(DEFAULTS).then(apply);
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
     chrome.storage.sync.get(DEFAULTS).then(apply);
